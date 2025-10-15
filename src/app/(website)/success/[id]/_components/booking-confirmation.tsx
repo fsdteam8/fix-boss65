@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
@@ -10,7 +10,7 @@ interface Props {
   bookingId: string;
 }
 export default function BookingConfirmation({ bookingId }: Props) {
-  const { data, refetch } = useQuery({
+  const { data } = useQuery({
     queryKey: ["booking", bookingId],
     queryFn: async () => {
       const res = await fetch(
@@ -23,6 +23,7 @@ export default function BookingConfirmation({ bookingId }: Props) {
       );
 
       if (!res.ok) {
+        console.log(res.statusText)
         throw new Error("Network response was not ok");
       }
 
@@ -30,48 +31,69 @@ export default function BookingConfirmation({ bookingId }: Props) {
     },
   });
 
+  const {mutate} = useMutation({
+    mutationKey: ["booking", bookingId],
+    mutationFn: (id: string) => fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/payment/confirm`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ bookingId: id }),
+    
+
+    }).then((res) => res.json()),
+    
+  })
+
   // Backup confirmation mechanism - if booking is still pending, try to confirm it
-  useEffect(() => {
-    const confirmBookingIfPending = async () => {
-      if (data?.data?.status === "pending") {
-        console.log(
-          "🔄 Booking is still pending, attempting backup confirmation..."
-        );
+  // useEffect(() => {
+  //   const confirmBookingIfPending = async () => {
+  //     if (data?.data?.status === "pending") {
+  //       console.log(
+  //         "🔄 Booking is still pending, attempting backup confirmation..."
+  //       );
 
-        try {
-          const confirmRes = await fetch(
-            `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/booking/${bookingId}`,
-            {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ status: "confirmed" }),
-            }
-          );
+  //       try {
+  //         const confirmRes = await fetch(
+  //           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/booking/${bookingId}`,
+  //           {
+  //             method: "PUT",
+  //             headers: {
+  //               "Content-Type": "application/json",
+  //             },
+  //             body: JSON.stringify({ status: "confirmed" }),
+  //           }
+  //         );
 
-          if (confirmRes.ok) {
-            console.log("✅ Backup confirmation successful");
-            refetch(); // Refresh the booking data
-          } else {
-            console.log(
-              "⚠️ Backup confirmation failed, but webhook should handle it"
-            );
-          }
-        } catch (error) {
-          console.log("⚠️ Backup confirmation error:", error);
-        }
-      }
-    };
+  //         if (confirmRes.ok) {
+  //           console.log("✅ Backup confirmation successful");
+  //           refetch(); // Refresh the booking data
+  //         } else {
+  //           console.log(
+  //             "⚠️ Backup confirmation failed, but webhook should handle it"
+  //           );
+  //         }
+  //       } catch (error) {
+  //         console.log("⚠️ Backup confirmation error:", error);
+  //       }
+  //     }
+  //   };
 
-    // Only run if we have data and booking is pending
-    if (data?.data) {
-      confirmBookingIfPending();
-    }
-  }, [data, bookingId, refetch]);
+  //   // Only run if we have data and booking is pending
+  //   if (data?.data) {
+  //     confirmBookingIfPending();
+  //   }
+  // }, [data, bookingId, refetch]);
 
   const successData = data?.data || [];
   // console.log(successData);
+
+  useEffect(() => {
+    if(bookingId) {
+      mutate(bookingId)
+    }
+
+  }, [bookingId, mutate])
 
   return (
     <div className="my-32">
